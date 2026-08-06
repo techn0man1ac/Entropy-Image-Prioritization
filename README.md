@@ -4,6 +4,8 @@ A clear, lightweight Python tool that calculates spatial **Shannon Entropy** ove
 
 Unlike smooth gradient visualizers, this implementation preserves exact pixel-aligned grid boundaries ($N \times N$), making it ideal for discrete spatial analysis, image processing pipelines, and region-of-interest (ROI) prioritizing.
 
+![Screenshot with Milka cat](https://raw.githubusercontent.com/techn0man1ac/Entropy-Image-Prioritization/refs/heads/main/Figure_1.png)
+
 ---
 
 ##  Demo Features
