@@ -1,67 +1,125 @@
-# Smooth Image Entropy Heatmap Generator
+# Image Block Entropy Heatmap Generator
 
-An optimized Python tool that computes spatial Shannon Entropy over local image regions and generates a seamless, high-resolution heat map overlay on top of the original image using OpenCV, NumPy, and Matplotlib.
+A clear, lightweight Python tool that calculates spatial **Shannon Entropy** over discrete image blocks and visualizes the result as a side-by-side comparison using OpenCV, NumPy, and Matplotlib.
 
-## Overview
+Unlike smooth gradient visualizers, this implementation preserves exact pixel-aligned grid boundaries ($N \times N$), making it ideal for discrete spatial analysis, image processing pipelines, and region-of-interest (ROI) prioritizing.
 
-Spatial Shannon Entropy measures local visual information density. Regions with rich textures, sharp edges, or high detail exhibit higher entropy, while smooth or uniform backgrounds have lower values.
+---
 
-Unlike traditional grid-based methods that suffer from rigid boundary artifacts, this implementation features dynamic scaling, vectorized sliding windows, bicubic interpolation, and Gaussian smoothing to yield clean, organic heatmaps.
+##  Demo Features
 
-## Key Features
+* **Side-by-Side View:** Displays the original color image next to the block-entropy heatmap in a clean $800 \times 600$ window.
+* **Pixel-Accurate Grid:** Uses direct slice-based map assignment (eliminating `cv2.resize` artifacts), ensuring block color boundaries align perfectly with grid lines.
+* **Adjustable Parameters:** Easily customize block dimensions and heatmap overlay opacity ($\alpha$).
 
-- **Seamless Visuals:** Replaces harsh block transitions with smooth color gradients via bicubic interpolation and Gaussian filtering.
-- **Dynamic Sizing:** Automatically calculates the optimal processing block size based on relative image dimensions.
-- **50% Window Overlap:** Evaluates overlapping visual fields to prevent edge loss at block boundaries.
-- **Vectorized Performance:** Uses `numpy.lib.stride_tricks` to process image patches rapidly without heavy pure-Python loops.
-- **Safe Execution:** Includes explicit resource cleanup (`plt.close('all')`) to prevent window locks.
+---
 
-## Mathematical Formulation
+##  How It Works
 
-For a grayscale block $B$ of size $W \times H$, the discrete intensity probability $p(x)$ for luminance levels $x \in [0, 255]$ is:
+1. High entropy values (red/warm areas) highlight complex, detailed visual regions (e.g., textures, edges, faces).
+2. Low entropy values (blue/cold areas) correspond to uniform or flat regions (e.g., plain backgrounds, sky).
 
-$$p(x) = \frac{\text{hist}[x]}{\sum_{i=0}^{255} \text{hist}[i]}$$
+---
 
-The Shannon Entropy $H(B)$ in bits is defined as:
+##  Installation
 
-$$H(B) = -\sum_{x=0}^{255} p(x) \log_2(p(x)) \quad \text{where } p(x) > 0$$
-
-The resulting entropy grid $H$ is normalized using Min-Max scaling to an 8-bit scale $[0, 255]$:
-
-$$H_{\text{norm}} = \frac{H - H_{\min}}{H_{\max} - H_{\min}} \times 255$$
-
-## Installation
-
-Ensure you have Python 3.8+ installed along with the required dependencies:
+Make sure you have Python 3.8+ installed along with the required libraries:
 
 ```bash
-pip install numpy opencv-python matplotlib
+pip install opencv-python numpy matplotlib
 
 ```
 
-## Quick Start
+---
+
+##  Usage
 
 ```python
-from smooth_entropy import generate_smooth_entropy_overlay
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
 
-# Generate overlay with dynamic scaling and smooth gradients
-generate_smooth_entropy_overlay(
-    image_path="path/to/your/image.jpg",
-    block_scale=0.03,  # 3% of the image's smallest dimension
-    alpha=0.35,        # 35% heatmap opacity
-    blur_radius=25     # Gaussian smoothing radius
-)
+
+def calculate_entropy(block):
+    if block.size == 0:
+        return 0.0
+    hist, _ = np.histogram(block, bins=256, range=[0, 256])
+    prob = hist[hist > 0] / block.size
+    return -np.sum(prob * np.log2(prob))
+
+
+def generate_entropy_comparison(image_path, block_size=100, alpha=0.3):
+    img_bgr = cv2.imread(image_path)
+    if img_bgr is None:
+        print("Error: Could not load image. Check the file path!")
+        return
+
+    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+    img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    h, w = img_gray.shape
+
+    # 1. Compute entropy map at full image resolution
+    entropy_full = np.zeros((h, w), dtype=np.float32)
+
+    for y in range(0, h, block_size):
+        for x in range(0, w, block_size):
+            block = img_gray[y : y + block_size, x : x + block_size]
+            val = calculate_entropy(block)
+            entropy_full[y : y + block_size, x : x + block_size] = val
+
+    # 2. Normalize and apply JET colormap
+    norm_map = cv2.normalize(
+        entropy_full, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U
+    )
+    heatmap_color = cv2.applyColorMap(norm_map, cv2.COLORMAP_JET)
+
+    # 3. Blend overlay and draw crisp grid borders
+    overlay = cv2.addWeighted(heatmap_color, alpha, img_bgr, 1 - alpha, 0)
+
+    for y in range(0, h, block_size):
+        for x in range(0, w, block_size):
+            cv2.rectangle(
+                overlay,
+                (x, y),
+                (min(x + block_size, w), min(y + block_size, h)),
+                (255, 255, 255),
+                1,
+            )
+
+    overlay_rgb = cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB)
+
+    # 4. Display in 800x600 window (8x6 inches at 100 DPI)
+    fig, axes = plt.subplots(1, 2, figsize=(8, 6), dpi=100)
+
+    axes[0].imshow(img_rgb)
+    axes[0].set_title("Original Image")
+    axes[0].axis("off")
+
+    axes[1].imshow(overlay_rgb)
+    axes[1].set_title(f"Entropy Grid ({block_size}px)")
+    axes[1].axis("off")
+
+    plt.tight_layout()
+    plt.show()
+    plt.close("all")
+
+
+# Run script
+generate_entropy_comparison("path/to/your/image.jpg", block_size=100, alpha=0.3)
 
 ```
 
-## Parameters
+---
+
+##  Parameters
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `image_path` | `str` | Required | Path to the target image file. |
-| `block_scale` | `float` | `0.03` | Block size ratio relative to `min(height, width)`. |
-| `alpha` | `float` | `0.3` | Heatmap transparency overlay weight ($0.0$ to $1.0$). |
-| `blur_radius` | `int` | `15` | Kernel radius for Gaussian smoothing (automatically converted to an odd integer). |
+| `image_path` | `str` | *Required* | Path to the target image file. |
+| `block_size` | `int` | `100` | Size of each square block in pixels. |
+| `alpha` | `float` | `0.3` | Transparency of heatmap layer ($0.0$ = transparent, $1.0$ = opaque heatmap). |
+
+---
 
 ## License
 
