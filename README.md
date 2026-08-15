@@ -1,52 +1,68 @@
 # RGB Image Block Entropy Prioritization
 
-A small, lightweight Python prototype that uses **Shannon entropy of real RGB colors** to estimate how visually varied each image block is, then turns that value into a simple **priority ranking**.
+A small, lightweight **image-processing prototype** that uses **multivariate Shannon entropy of RGB colors** to estimate how varied each image block is and then prioritize the most varied blocks.
 
-The project is intentionally simple. It uses only **OpenCV, NumPy, and Matplotlib**. There is no machine learning model, no neural network, and no heavy image-processing pipeline.
+The project is intentionally simple. It uses only:
+
+- OpenCV
+- NumPy
+- Matplotlib
+
+There is **no machine learning model, no neural network, and no heavy processing pipeline**.
 
 ![Screenshot with Milka cat](https://raw.githubusercontent.com/techn0man1ac/Entropy-Image-Prioritization/refs/heads/main/Python/Figure_1.png)
 
----
-
 ## What does the project do?
 
-The program follows five simple steps:
+The program follows this simple pipeline:
 
-1. Load a color image.
-2. Split it into square blocks, for example `100 x 100` pixels.
-3. Calculate Shannon entropy from the **full RGB color of every pixel** in each block.
-4. Convert the entropy values into a relative `0-100` priority score and rank the blocks.
-5. Show the result as a color heatmap and highlight the highest-priority blocks.
+```text
+Color image
+    ↓
+100×100 pixel blocks
+    ↓
+H(R), H(G), H(B)
+    ↓
+Joint multivariate H(R,G,B)
+    ↓
+Priority score 0–100
+    ↓
+Top 10% blocks
+    ↓
+Heatmap + red priority borders
+```
 
 In simple words:
 
-> **The more different RGB colors a block contains, the more information it gets in the entropy score, and the higher its priority can become.**
+> **The program looks at the complete RGB colors inside every block. Blocks with a more varied distribution of full RGB colors get higher joint entropy and therefore higher priority.**
 
-This is a lightweight way to decide which image regions could be inspected first by a more expensive algorithm later.
+The final image is shown in the same simple two-panel style as the reference project:
 
----
+- left: the original image;
+- right: RGB entropy heatmap + block grid + prioritized blocks.
 
-## Important: this is real RGB entropy
+The result is also saved as `Figure_1.png`.
 
-The original prototype converted the image to grayscale before calculating entropy. This version does **not** do that for entropy.
+## What is multivariate RGB entropy?
 
-For every pixel, the three color channels are kept together:
+The important part is that the three color channels are kept together.
 
-```text
-RGB = (R, G, B)
-```
-
-The code packs each RGB triplet into one integer and builds a histogram from the actual colors that appear in the block.
-
-So these colors are treated as different values:
+For each pixel we use the complete observation:
 
 ```text
-(255, 0, 0)     red
-(0, 255, 0)     green
-(0, 0, 255)     blue
+(R, G, B)
 ```
 
-This keeps the calculation simple while using the full color information instead of reducing everything to grayscale.
+The program calculates four values for every block:
+
+```text
+H(R)       -> red-channel entropy
+H(G)       -> green-channel entropy
+H(B)       -> blue-channel entropy
+H(R,G,B)   -> joint multivariate RGB entropy
+```
+
+The **joint value `H(R,G,B)` is the priority signal**.
 
 The Shannon entropy formula is:
 
@@ -54,112 +70,224 @@ The Shannon entropy formula is:
 H = -sum(p * log2(p))
 ```
 
-where `p` is the probability of each RGB color inside the block.
+For the joint calculation, `p` is the probability of each complete RGB color that occurs in the block.
 
----
-
-## What is the priority score?
-
-The prototype uses a deliberately simple rule:
+This is different from grayscale entropy:
 
 ```text
-priority score = normalized RGB entropy
+RGB -> grayscale -> H(gray)
 ```
 
-The lowest entropy found in the image becomes `0`, and the highest becomes `100`.
-
-This is a **relative score inside the current image**. A score of `100` means that the block has the highest entropy in that image, not that it has a universal or absolute importance of `100`.
-
-The program then selects the top percentage of blocks, for example:
+and different from simply averaging three independent measurements:
 
 ```text
-Top 10% blocks → prioritized
-Remaining 90% → not prioritized
+(H(R) + H(G) + H(B)) / 3
 ```
 
-The highest-priority blocks are marked with red borders and rank numbers in `Figure_1.png`. The same figure is displayed automatically when the function runs, so the map can be inspected immediately without opening the PNG manually.
+Here the full RGB color is treated as one three-dimensional observation.
 
-This is intentionally not a machine-learning prediction. It is a small and explainable ranking rule.
+## Why use RGB instead of grayscale?
 
----
+Converting to grayscale removes direct color information.
 
-## Why use entropy for prioritization?
+This prototype keeps the original RGB values so the entropy can react to changes in color as well as changes in brightness.
 
-A block with very similar pixels is usually visually simple:
+For example, these are different RGB observations:
 
 ```text
-100 100 101 100
-100 101 100 100
+(220, 40, 40)
+(40, 220, 40)
+(40, 40, 220)
 ```
 
-A block containing many different colors is more varied:
+A joint RGB histogram keeps those color combinations separate.
+
+## Why is the calculation still lightweight?
+
+A full 8-bit RGB image has:
 
 ```text
- 20 180  70 230
- 90  40 210 120
+256 × 256 × 256 = 16,777,216
 ```
 
-Entropy gives a compact number for this difference.
+possible exact RGB colors.
 
-This can be useful as a **cheap first filter** before running a more expensive task such as object detection, OCR, segmentation, or detailed analysis.
+The code does **not** allocate a large 256×256×256 array. Instead, it packs each RGB pixel into one 24-bit integer and uses NumPy's `unique(..., return_counts=True)` to count the colors that actually occur in the current block.
 
-The important limitation is that entropy is not the same as semantic importance:
+For the small prototype image this is simple, readable, and fast enough for an ordinary computer.
+
+## What is image prioritization here?
+
+After calculating `H(R,G,B)` for every block, the blocks are sorted from highest entropy to lowest entropy.
+
+The entropy values are also converted to a relative score from `0` to `100`:
 
 ```text
-high entropy != important object
-low entropy  != unimportant object
+lowest entropy  -> 0
+highest entropy -> 100
 ```
 
-For example, image noise or a very detailed texture can also have high entropy.
+By default, the top **10%** of blocks are selected.
 
----
+Those blocks receive rank numbers:
 
-## Why not use a machine-learning model?
+```text
+#1  highest joint RGB entropy
+#2  second highest
+#3  third highest
+...
+```
 
-This repository is intentionally a **small educational/prototype image-processing project**.
+They are marked with red borders in the final image.
 
-The goal is to keep the idea:
+This is a deliberately simple and explainable prioritization rule.
 
-- easy to read;
-- easy to run;
-- easy to explain;
-- fast enough for a simple computer;
-- free from large model downloads.
+## What does a high priority mean?
 
-The entropy ranking can later become one input to a larger computer-vision system, but this project does not need a neural network to demonstrate the idea.
+It means:
 
----
+> **This block contains a more varied distribution of complete RGB colors than most other blocks in the same image.**
 
-## How the code stays lightweight
+It does **not** automatically mean:
 
-The implementation avoids expensive techniques such as:
+```text
+high priority = important object
+```
 
-- neural networks;
-- dense per-pixel optimization;
-- large pre-trained models;
-- large intermediate images for every block.
+Entropy does not understand the semantic meaning of an image.
 
-For each block, it only needs to count the RGB colors that actually occur in that block and then apply the Shannon entropy formula.
+For example, a detailed texture, foliage, hair, JPEG artifacts, or image noise can all produce high entropy.
 
-The entropy map is also written directly into the matching image coordinates, so the block boundaries stay aligned with the original image. No `cv2.resize()` step is used to stretch a smaller map over the image.
+Therefore this project should be viewed as a **cheap first-pass filter**, not as an object detector.
 
----
+## Why calculate H(R), H(G), and H(B) too?
 
-## Installation
+The three marginal values are useful for understanding the result.
 
-Python 3.8+ is recommended.
+A block might have:
 
-Install the three required libraries:
+```text
+H(R) = 4.8
+H(G) = 5.2
+H(B) = 3.9
+H(R,G,B) = 7.7
+```
+
+The individual values help explain variation in each channel, while the joint value is used for the final ranking.
+
+## Why use blocks?
+
+The image is divided into fixed square regions, for example:
+
+```text
+100 × 100 pixels
+```
+
+Each block receives one entropy value.
+
+This creates a simple spatial map:
+
+```text
+[ 4.1 ][ 5.2 ][ 2.9 ]
+[ 6.4 ][ 7.0 ][ 3.8 ]
+[ 4.0 ][ 6.1 ][ 5.0 ]
+```
+
+The heatmap shows those values visually.
+
+The block size is deliberately configurable. Smaller blocks provide more local detail; larger blocks are coarser but reduce the number of calculations.
+
+## Output
+
+When `main.py` finishes, it:
+
+1. calculates the entropy for all blocks;
+2. ranks the blocks;
+3. creates the heatmap and priority overlay;
+4. saves the result to `Figure_1.png`;
+5. **opens the final figure using Matplotlib** so the result is immediately visible when running the script normally.
+
+The figure has the same basic presentation style as the reference implementation:
+
+```text
+┌──────────────────────┬────────────────────────────┐
+│                      │                            │
+│    Original Image    │  RGB Entropy + Priority    │
+│                      │                            │
+│        photo         │ heatmap + grid + #1 #2...  │
+│                      │                            │
+└──────────────────────┴────────────────────────────┘
+```
+
+## How to run
+
+Put all five files in the same directory:
+
+```text
+README.md
+main.py
+MilkaCat.jpg
+Figure_1.png
+LICENSE
+```
+
+Install the three required packages:
 
 ```bash
-pip install opencv-python numpy matplotlib
+pip install numpy opencv-python matplotlib
 ```
 
----
+Then run:
 
-## Run the demo
+```bash
+python main.py
+```
 
-Keep these five files in the same project folder:
+The program automatically uses `MilkaCat.jpg` next to `main.py`.
+
+## Main parameters
+
+The defaults are defined near the top of `main.py`:
+
+```python
+DEFAULT_BLOCK_SIZE = 100
+DEFAULT_ALPHA = 0.30
+DEFAULT_TOP_PERCENT = 10.0
+```
+
+### `DEFAULT_BLOCK_SIZE`
+
+Controls the block size in pixels.
+
+```text
+50  -> smaller, more local blocks
+100 -> balanced default
+200 -> larger, coarser blocks
+```
+
+### `DEFAULT_ALPHA`
+
+Controls how strongly the entropy heatmap is blended with the original image.
+
+```text
+0.0 -> original image only
+1.0 -> heatmap only
+0.3 -> balanced overlay
+```
+
+### `DEFAULT_TOP_PERCENT`
+
+Controls how many blocks become prioritized.
+
+```text
+5  -> only the highest 5%
+10 -> highest 10%
+20 -> highest 20%
+```
+
+## Project structure
+
+The project intentionally remains a small educational/prototype image-processing project:
 
 ```text
 ├── LICENSE
@@ -170,127 +298,46 @@ Keep these five files in the same project folder:
     └── main.py
 ```
 
-Then run:
-
-```bash
-python main.py
-```
-
-The script automatically uses `MilkaCat.jpg` next to `main.py`, saves the updated result to `Figure_1.png`, and **opens the generated image-map on screen**.
-
-The program also prints the highest-priority blocks to the terminal, including their coordinates, RGB entropy, and relative priority score.
-
-The map display is enabled by default through `show_result=True`. For a headless machine or a server without a graphical display, call the function with `show_result=False`; the PNG will still be generated normally.
-
----
-
-## Main parameters
-
-The example at the bottom of `main.py` uses:
-
-```python
-block_size=100
-alpha=0.30
-top_percent=10.0
-```
-
-| Parameter | Type | Default | Meaning |
-| --- | --- | --- | --- |
-| `image_path` | `str` or `Path` | required | Input image path |
-| `output_path` | `str` or `Path` | `Figure_1.png` | Output figure path |
-| `block_size` | `int` | `100` | Width and height of each square block in pixels |
-| `alpha` | `float` | `0.30` | Heatmap opacity from `0.0` to `1.0` |
-| `top_percent` | `float` | `10.0` | Percentage of blocks selected for priority |
-| `show_result` | `bool` | `True` | Display the generated map window after saving |
-
-### Choosing the block size
-
-The block size controls the balance between detail and simplicity.
-
-- Smaller blocks give more local detail but create more blocks.
-- Larger blocks are faster and smoother but less local.
-
-`100 x 100` is a simple starting point for the included example.
-
----
-
-## Output
-
-`Figure_1.png` contains two views:
-
-### Original Image
-
-The untouched input image.
-
-### RGB Entropy + Priority
-
-The right side combines three simple pieces of information:
-
-1. **Heatmap color** — relative RGB entropy of each block.
-2. **White grid** — exact block boundaries.
-3. **Red borders and rank numbers** — blocks selected by the priority rule.
-
-This makes the prototype useful both as a visual explanation and as a starting point for a later image-processing pipeline.
-
----
-
-## Example priority flow
-
-```text
-Color image
-    |
-    v
-Split into blocks
-    |
-    v
-Exact RGB color counts
-    |
-    v
-Shannon entropy
-    |
-    v
-Normalize to 0-100
-    |
-    v
-Sort blocks
-    |
-    v
-Select top N%
-    |
-    v
-Use these blocks first in a later task
-```
-
-For example, a future pipeline could be:
-
-```text
-RGB entropy priority
-        |
-        v
-Top 10% blocks
-        |
-        v
-Object detector / OCR / segmentation
-```
-
-The current repository stops at the priority ranking step. It does not try to decide what object is inside a block.
-
----
+There are no extra modules or services.
 
 ## Limitations
 
-This is still a **small educational/prototype project**, not a complete production prioritization system.
+This prototype is intentionally simple.
 
-RGB entropy can favor:
+It does not:
 
-- detailed textures;
-- strong edges;
-- colorful areas;
-- image noise.
+- detect objects;
+- recognize faces;
+- understand the meaning of a scene;
+- perform segmentation;
+- use machine learning;
+- guarantee that the highest-entropy blocks are the most important blocks.
 
-It does not understand the meaning of the image. A high-priority block is simply a block with relatively high RGB entropy in the current image.
+Another limitation is that exact RGB entropy can be influenced by tiny color variations introduced by JPEG compression, sensors, or lighting. This prototype intentionally keeps the exact RGB calculation because it is the clearest demonstration of **joint multivariate RGB entropy** and remains practical for the small example image.
 
-Also, the priority score is normalized separately for each image, so scores should not be treated as absolute values across unrelated images.
+## Possible future extension
+
+A future version could combine joint RGB entropy with another very cheap signal such as edge density or local sharpness:
+
+```text
+RGB entropy
+     +
+edge density
+     +
+sharpness
+     ↓
+priority score
+```
+
+That would still be lightweight, while making the priority estimate less dependent on color diversity alone.
+
+## Project category
+
+**Small educational/prototype image-processing project.**
+
+The goal is to demonstrate a simple, explainable idea:
+
+> **Use local multivariate RGB entropy as a cheap first-pass signal for deciding which image regions deserve attention first.**
 
 ---
 
