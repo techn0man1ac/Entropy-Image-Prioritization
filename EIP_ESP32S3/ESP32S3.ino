@@ -18,13 +18,16 @@
 // ============================================================================
 // 1. CONFIGURATION & MEMORY CONSTRAINTS (Entropy-Image-Prioritization)
 // ============================================================================
-const char* ssid = "Tech01";
-const char* password = "qazec1233";
-const char* urlPicture = "https://raw.githubusercontent.com/techn0man1ac/Entropy-Image-Prioritization/refs/heads/main/Python/MilkaCat_baseline.jpg";
+const char* ssid = "your-ssid"
+const char* password = "your-password"
+const char* urlPicture = "https://raw.githubusercontent.com/techn0man1ac/Entropy-Image-Prioritization/refs/heads/main/Python/MilkaCat_baseline.jpg"; // JPG baseline!
 
 #define BLOCK_SIZE 50            // ROI block dimension
 #define TOP_PERCENT 10.0f        // Percentage of top high-entropy blocks to prioritize
 #define ALPHA 0.35f              // Heatmap transparency overlay coefficient
+
+#define IMG_SCALE_WIDTH 8        // Image width scale (8 - defalt)
+#define IMG_SCALE_HEIGHT 8       // Image height scale (8 - defalt)
 
 #define MAX_IMAGE_WIDTH 512
 #define MAX_IMAGE_HEIGHT 512
@@ -187,8 +190,9 @@ void process_image_from_web() {
           uint16_t orig_h = jpeg.getHeight();
 
           int scale = JPEG_SCALE_EIGHTH;
-          img_width = orig_w / 8;
-          img_height = orig_h / 8;
+
+          img_width = orig_w / IMG_SCALE_WIDTH;
+          img_height = orig_h / IMG_SCALE_HEIGHT;
 
           if (img_width > MAX_IMAGE_WIDTH) img_width = MAX_IMAGE_WIDTH;
           if (img_height > MAX_IMAGE_HEIGHT) img_height = MAX_IMAGE_HEIGHT;
