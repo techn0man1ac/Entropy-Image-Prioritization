@@ -285,13 +285,24 @@ Controls how many blocks become prioritized.
 20 -> highest 20%
 ```
 
+## Implementation ESP32
+
+Implementation of Python code and an algorithm on a processor with limited resources (ESP32S3).
+
+https://github.com/techn0man1ac/Entropy-Image-Prioritization/tree/main/EIP_ESP32S3
+
+Just as a demonstration that this idea can work in C/C++ and under resource-constrained conditions (low CPU clock speed and limited RAM).
+
 ## Project structure
 
-The project intentionally remains a small educational/prototype image-processing project:
+The project intentionally remains a small educational/prototype image-processing project. 
 
 ```text
 ├── LICENSE
 ├── README.md
+├── EIP_ESP32S3/
+    ├── ESP32S3.ino
+    ├── README.md
 └── Python/
     ├── Figure_1.png
     ├── MilkaCat.jpg
