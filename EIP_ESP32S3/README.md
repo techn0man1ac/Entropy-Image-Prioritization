@@ -1,0 +1,1 @@
+Implementation of Python code and an algorithm on a processor with limited resources (ESP32S3).
