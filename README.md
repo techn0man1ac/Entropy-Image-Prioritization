@@ -224,11 +224,15 @@ The figure has the same basic presentation style as the reference implementation
 Put all five files in the same directory:
 
 ```text
-README.md
-main.py
-MilkaCat.jpg
-Figure_1.png
-LICENSE
+├── LICENSE
+├── README.md
+├── EIP_ESP32S3/
+    ├── ESP32S3.ino
+    ├── README.md
+└── Python/
+    ├── Figure_1.png
+    ├── MilkaCat.jpg
+    └── main.py
 ```
 
 Install the three required packages:
@@ -244,6 +248,8 @@ python main.py
 ```
 
 The program automatically uses `MilkaCat.jpg` next to `main.py`.
+
+Or upload ESP32S3.ino to your ESP32S3 board, and, following the log, navigate to the IP address provided by the board.
 
 ## Main parameters
 
